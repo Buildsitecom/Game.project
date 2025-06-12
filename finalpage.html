@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spyfall Game - Playing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        .player-box {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 5px 10px;
+            display: inline-flex;
+            align-items: center;
+            margin: 2px;
+        }
+
+        .crown {
+            font-size: 1.2rem;
+            margin-left: 5px;
+        }
+
+        .location-grid button {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .strikethrough {
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container text-center">
+        <div class="row d-flex justify-content-center align-items-center">
+            <div class="col-md-6 text-center">
+
+                <p class="fs-5 mb-1">
+                    <span id="timer">00:00</span>
+                    <a href="#" class="float-end small" onclick="toggleLocations()">show/hide</a>
+                </p>
+                <hr>
+
+                <p class="fw-semibold">You are the spy!<br>The location: ???</p>
+                <hr>
+
+                <h5>Players</h5>
+                <div id="playersContainer" class="mb-3 d-flex flex-wrap justify-content-center"></div>
+
+                <hr>
+                <h6 class="mb-3">Location reference</h6>
+
+                <div class="row location-grid" id="locationGrid">
+                    <div class="col-6" id="locationsLeft"></div>
+                    <div class="col-6" id="locationsRight"></div>
+                </div>
+
+                <hr>
+                <button class="btn btn-outline-dark mt-2" onclick="endGame()">END GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAFOenFl1wULnf2_Kh1Dyx4lGjPATJiV_s",
+            authDomain: "simple-game-709c6.firebaseapp.com",
+            databaseURL: "https://simple-game-709c6-default-rtdb.firebaseio.com",
+            projectId: "simple-game-709c6",
+            storageBucket: "simple-game-709c6.appspot.com",
+            messagingSenderId: "87856525192",
+            appId: "1:87856525192:web:804023d0198f011ec2143d"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const accessCode = urlParams.get('code') || 'N/A';
+        const savedPlayerName = localStorage.getItem('playerName') || 'Player';
+        const playersContainer = document.getElementById('playersContainer');
+        const gameRef = database.ref('games/' + accessCode);
+
+        let selectedLocations = [];
+
+        // Location List
+        const locations = [
+            "Airplane", "Bank", "Beach", "Casino", "Cathedral", "Coat Mine", "Corporate Party", "Gas Station",
+            "Hospital", "Jail", "Library", "Passenger Train", "Police Station", "Race Track", "Restaurant",
+            "Retirement Home", "Service Station", "Space Station", "Subway", "Theater", "Wedding", "Art Museum",
+            "Baseball Stadium", "Candy Factory", "Cat Show", "Circus Tent", "Construction Site", "Crusader Army",
+            "Harbor Docks", "Hotel", "Jazz Club", "Military Base", "Pirate Ship", "Police Station", "Restaurant",
+            "Rock Concert", "Sightseeing Bus", "Submarine", "The United Nations", "Vineyard", "World War II Squad"
+        ];
+
+        function renderLocations() {
+            const half = Math.ceil(locations.length / 2);
+            const left = locations.slice(0, half);
+            const right = locations.slice(half);
+
+            const leftDiv = document.getElementById("locationsLeft");
+            const rightDiv = document.getElementById("locationsRight");
+
+            left.forEach(loc => {
+                const btn = document.createElement("button");
+                btn.className = "btn btn-outline-secondary";
+                btn.style.marginBottom = "5px";
+                btn.textContent = loc;
+                btn.onclick = () => selectLocation(btn, loc);
+                leftDiv.appendChild(btn);
+            });
+
+            right.forEach(loc => {
+                const btn = document.createElement("button");
+                btn.className = "btn btn-outline-secondary";
+                btn.style.marginBottom = "5px";
+                btn.textContent = loc;
+                btn.onclick = () => selectLocation(btn, loc);
+                rightDiv.appendChild(btn);
+            });
+        }
+
+        renderLocations();
+
+        function selectLocation(button, locationName) {
+            if (selectedLocations.includes(locationName)) return;
+
+            if (selectedLocations.length >= 5) {
+                alert("Maximum 5 locations select kar sakte ho.");
+                return;
+            }
+
+            button.disabled = true;
+            button.classList.add("strikethrough");
+            selectedLocations.push(locationName);
+        }
+
+        // Render players
+        function renderPlayers(playersObj) {
+            playersContainer.innerHTML = "";
+            const playerNames = Object.keys(playersObj);
+            const currentPlayer = savedPlayerName;
+            const otherPlayers = playerNames.filter(name => name !== currentPlayer);
+
+            const currentPlayerBox = document.createElement("div");
+            currentPlayerBox.className = "player-box";
+            currentPlayerBox.innerHTML = `${currentPlayer} <span class="crown">👑</span>`;
+            playersContainer.appendChild(currentPlayerBox);
+
+            otherPlayers.forEach(name => {
+                const playerBox = document.createElement("div");
+                playerBox.className = "player-box";
+                playerBox.textContent = name;
+                playersContainer.appendChild(playerBox);
+            });
+        }
+
+        gameRef.child('players').on('value', (snapshot) => {
+            const players = snapshot.val();
+            if (players) renderPlayers(players);
+        });
+
+        function toggleLocations() {
+            const grid = document.getElementById("locationGrid");
+            grid.style.display = grid.style.display === "none" ? "flex" : "none";
+        }
+
+        // Timer setup
+        const timerElement = document.getElementById("timer");
+        let playtimeMinutes = localStorage.getItem("playtime") || 10;
+        let timeRemaining = playtimeMinutes * 60;
+
+        function updateTimer() {
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, "0");
+            const seconds = (timeRemaining % 60).toString().padStart(2, "0");
+            timerElement.textContent = `${minutes}:${seconds}`;
+
+            if (timeRemaining > 0) {
+                timeRemaining--;
+            } else {
+                clearInterval(timerInterval);
+                alert("Time's up!");
+            }
+        }
+
+        const timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+
+        function endGame() {
+            if (selectedLocations.length === 0) {
+                alert("Kam se kam 1 location select karo.");
+                return;
+            }
+
+            clearInterval(timerInterval);
+            const playerRef = database.ref(`games/${accessCode}/players/${savedPlayerName}`);
+            const gameData = {
+                status: "ended",
+                selectedBySpy: selectedLocations,
+                spy: savedPlayerName
+            };
+
+            gameRef.update(gameData)
+                .then(() => playerRef.remove())
+                .then(() => {
+                    window.location.href = `scoring.html?code=${accessCode}`;
+                })
+                .catch((error) => {
+                    console.error("Error ending game:", error);
+                    alert("Game end karne mein error aayi.");
+                });
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
